@@ -349,7 +349,24 @@
             </button>
           </div>
         </div>
+<!-- Data Backup & Restore Section -->
+<div class="backup-container">
+  <h3>💾 Data Management</h3>
+  <p class="backup-subtitle">Save a copy of your Gengar data or restore from a file.</p>
+  
+  <div class="backup-actions">
+    <!-- Export Button -->
+    <button type="button" class="btn-backup export" onclick="exportBackup()">
+      📥 Export Backup (.json)
+    </button>
 
+    <!-- Import Button (Uses a hidden file input triggered by a styled button) -->
+    <label for="import-file-input" class="btn-backup import">
+      📤 Import Backup
+    </label>
+    <input type="file" id="import-file-input" accept=".json" onchange="importBackup(event)" style="display: none;">
+  </div>
+</div>
         <!-- Mode Explanation Banner -->
         <div class="bg-gradient-to-br from-purple-950/40 to-slate-900 border border-purple-900/30 rounded-2xl p-5 text-xs text-purple-300 space-y-2">
           <div class="font-bold text-purple-200 flex items-center space-x-2">
@@ -1163,6 +1180,46 @@ function finishWorkout() {
 }
     // Test trigger (runs as soon as page loads)
 startWorkout(sampleRoutine);
+    // --- 1. DEFAULT DATA STRUCTURE ---
+let appData = {
+  level: 1,
+  exp: 0,
+  totalMeters: 0,
+  history: [],  // Completed workouts array
+  routines: []  // Saved Hevy-style routines array
+};
+
+// --- 2. SAVE DATA TO BROWSER MEMORY ---
+function saveData() {
+  localStorage.setItem('gengarSwimData', JSON.stringify(appData));
+}
+
+// --- 3. LOAD DATA WHEN APP OPENS ---
+function loadData() {
+  const saved = localStorage.getItem('gengarSwimData');
+  if (saved) {
+    appData = JSON.parse(saved);
+    // Refresh your UI with saved values
+    updateUI();
+  }
+}
+
+// --- 4. EXPORT & IMPORT (Backup Feature) ---
+// Let him save a copy as a JSON file so he can transfer it across devices!
+function exportBackup() {
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute("href", dataStr);
+  downloadAnchor.setAttribute("download", "gengar_swim_backup.json");
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+}
+
+// Automatically load saved data when the web page loads
+window.onload = function() {
+  loadData();
+};
   </script>
 </body>
 </html>
