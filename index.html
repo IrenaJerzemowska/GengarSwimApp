@@ -91,6 +91,71 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #a855f7;
     }
+
+    /* Active Workout Container */
+#active-workout-screen {
+  background: #1d1135;
+  border: 2px solid #8b5cf6;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.workout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #3b2164;
+  padding-bottom: 10px;
+}
+
+#workout-timer {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #ff2a5f; /* Neon crimson timer */
+  font-family: monospace;
+}
+
+/* Individual Set Row */
+.set-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #2a1848;
+  padding: 12px 16px;
+  margin: 10px 0;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+/* Visual cue when checked off (Hevy style) */
+.set-row.completed {
+  opacity: 0.5;
+  background: #180d2b;
+  text-decoration: line-through;
+}
+
+.set-type-badge {
+  background: #8b5cf6;
+  color: #fff;
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 8px;
+  text-decoration: none !important;
+}
+
+/* Checkbox styling */
+.checkbox-container input {
+  width: 22px;
+  height: 22px;
+  accent-color: #8b5cf6;
+  cursor: pointer;
+}
+
+.hidden {
+  display: none !important;
+}
   </style>
 </head>
 <body class="min-h-screen pb-12">
@@ -118,6 +183,22 @@
       </div>
     </div>
   </header>
+  <!-- Active Workout Screen -->
+<div id="active-workout-screen" class="hidden">
+  <div class="workout-header">
+    <h2 id="active-routine-title">Active Swim</h2>
+    <div id="workout-timer">00:00</div>
+  </div>
+
+  <!-- Dynamic sets list rendered by JS -->
+  <div id="active-sets-list"></div>
+
+  <!-- Action Controls -->
+  <div class="workout-actions">
+    <button type="button" id="btn-add-set" onclick="addExtraSet()">+ Add Set</button>
+    <button type="button" id="btn-finish-swim" onclick="finishWorkout()">Finish & Log Swim</button>
+  </div>
+</div>
 
   <main class="max-w-6xl mx-auto px-4 pt-6 space-y-6">
 
@@ -950,6 +1031,138 @@
         renderApp();
       }
     }
+
+
+// --- STATE VARIABLES ---
+let activeWorkout = null;
+let timerInterval = null;
+let secondsElapsed = 0;
+
+// --- SAMPLE ROUTINE (For Testing) ---
+const sampleRoutine = {
+  id: "sample_1",
+  title: "Threshold & Sprint Set",
+  sets: [
+    { type: "Warmup", distance: 400, stroke: "Freestyle", notes: "Easy pace", completed: false },
+    { type: "Main Set", distance: 100, reps: 4, stroke: "Fly", notes: "@ 1:30 rest", completed: false },
+    { type: "Cooldown", distance: 200, stroke: "Choice", notes: "Loosen up", completed: false }
+  ]
+};
+
+// --- 1. START WORKOUT & TIMER ---
+function startWorkout(routineObj) {
+  // Deep copy the routine so checking off sets doesn't overwrite the template
+  activeWorkout = JSON.parse(JSON.stringify(routineObj));
+  
+  // Show active workout view
+  document.getElementById('active-workout-screen').classList.remove('hidden');
+  document.getElementById('active-routine-title').innerText = activeWorkout.title;
+
+  // Reset & Start Stopwatch
+  secondsElapsed = 0;
+  clearInterval(timerInterval);
+  timerInterval = setInterval(updateStopwatch, 1000);
+
+  // Render the sets on screen
+  renderActiveSets();
+}
+
+// Stopwatch Formatter (MM:SS)
+function updateStopwatch() {
+  secondsElapsed++;
+  const mins = Math.floor(secondsElapsed / 60).toString().padStart(2, '0');
+  const secs = (secondsElapsed % 60).toString().padStart(2, '0');
+  document.getElementById('workout-timer').innerText = `${mins}:${secs}`;
+}
+
+// --- 2. RENDER SETS WITH CHECKBOXES ---
+function renderActiveSets() {
+  const container = document.getElementById('active-sets-list');
+  container.innerHTML = '';
+
+  activeWorkout.sets.forEach((set, index) => {
+    // Calculate total distance for this set (reps * distance)
+    const reps = set.reps || 1;
+    const totalSetDistance = reps * set.distance;
+
+    const setCard = document.createElement('div');
+    setCard.className = `set-row ${set.completed ? 'completed' : ''}`;
+    
+    setCard.innerHTML = `
+      <div class="set-info">
+        <span class="set-type-badge">${set.type}</span>
+        <strong>${reps > 1 ? reps + 'x' : ''}${set.distance}m ${set.stroke}</strong>
+        <span class="set-notes">${set.notes ? '(' + set.notes + ')' : ''}</span>
+        <span class="set-total-meters">${totalSetDistance}m</span>
+      </div>
+      <label class="checkbox-container">
+        <input type="checkbox" ${set.completed ? 'checked' : ''} onchange="toggleSetComplete(${index})">
+        <span class="checkmark"></span>
+      </label>
+    `;
+
+    container.appendChild(setCard);
+  });
+}
+
+// --- 3. TOGGLE CHECKBOX STATE ---
+function toggleSetComplete(index) {
+  activeWorkout.sets[index].completed = !activeWorkout.sets[index].completed;
+  renderActiveSets(); // Re-render to apply 'completed' CSS styling
+}
+
+// --- 4. DYNAMICALLY ADD EXTRA SET MID-WORKOUT ---
+function addExtraSet() {
+  const distance = parseInt(prompt("Set distance in meters:", "100")) || 100;
+  const stroke = prompt("Stroke (Freestyle, Fly, Back, Breast, IM):", "Freestyle") || "Freestyle";
+
+  activeWorkout.sets.push({
+    type: "Main Set",
+    distance: distance,
+    reps: 1,
+    stroke: stroke,
+    notes: "Added live",
+    completed: true // Automatically check off extra sets
+  });
+
+  renderActiveSets();
+}
+
+// --- 5. FINISH WORKOUT & CALCULATE EXP ---
+function finishWorkout() {
+  // Stop timer
+  clearInterval(timerInterval);
+
+  // Filter and sum ONLY completed sets
+  let totalMetersSwum = 0;
+
+  activeWorkout.sets.forEach(set => {
+    if (set.completed) {
+      const reps = set.reps || 1;
+      totalMetersSwum += (reps * set.distance);
+    }
+  });
+
+  if (totalMetersSwum === 0) {
+    alert("No sets were checked off! Check off at least one set before finishing.");
+    return;
+  }
+
+  // Calculate Gengar EXP (10 meters = 1 EXP point)
+  const expEarned = Math.floor(totalMetersSwum / 10);
+
+  // Apply rewards (using the helper functions from your main script)
+  if (typeof addWorkout === 'function') {
+    addWorkout(totalMetersSwum, "moderate");
+  }
+
+  alert(`🏆 Swim Finished!\n\n⏱️ Duration: ${document.getElementById('workout-timer').innerText}\n🏊 Distance: ${totalMetersSwum}m\n👻 Gengar earned +${expEarned} EXP!`);
+
+  // Hide logger screen
+  document.getElementById('active-workout-screen').classList.add('hidden');
+}
+    // Test trigger (runs as soon as page loads)
+startWorkout(sampleRoutine);
   </script>
 </body>
 </html>
