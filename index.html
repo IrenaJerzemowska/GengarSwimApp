@@ -156,6 +156,70 @@
 .hidden {
   display: none !important;
 }
+    /* Backup & Data Section */
+.backup-container {
+  background: #180d2b;
+  border: 1px solid #3b2164;
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.backup-container h3 {
+  margin: 0 0 4px 0;
+  color: #d8b4fe;
+  font-size: 1.1rem;
+}
+
+.backup-subtitle {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Backup Action Buttons */
+.btn-backup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn-backup.export {
+  background: #2a1848;
+  color: #a78bfa;
+  border: 1px solid #8b5cf6;
+}
+
+.btn-backup.export:hover {
+  background: #3b2164;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+}
+
+.btn-backup.import {
+  background: #2a1848;
+  color: #4ade80; /* Soft green accent for import */
+  border: 1px solid #22c55e;
+}
+
+.btn-backup.import:hover {
+  background: #14532d;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+}
   </style>
 </head>
 <body class="min-h-screen pb-12">
@@ -1220,6 +1284,81 @@ function exportBackup() {
 window.onload = function() {
   loadData();
 };
+    // --- EXPORT BACKUP FUNCTION ---
+function exportBackup() {
+  // 1. Get current data from localStorage
+  const savedData = localStorage.getItem('gengarSwimData');
+  
+  if (!savedData) {
+    alert("No swim data found to export yet! Log a workout first.");
+    return;
+  }
+
+  // 2. Format today's date for the filename (e.g., gengar_backup_2026-09-19.json)
+  const dateStr = new Date().toISOString().split('T')[0];
+  const fileName = `gengar_swim_backup_${dateStr}.json`;
+
+  // 3. Create a downloadable data blob
+  const dataBlob = new Blob([savedData], { type: 'application/json' });
+  const downloadUrl = URL.createObjectURL(dataBlob);
+
+  // 4. Create an invisible anchor link and click it to trigger browser download
+  const tempLink = document.createElement('a');
+  tempLink.href = downloadUrl;
+  tempLink.download = fileName;
+  document.body.appendChild(tempLink);
+  tempLink.click();
+
+  // 5. Clean up memory
+  document.body.removeChild(tempLink);
+  URL.revokeObjectURL(downloadUrl);
+}
+
+// --- IMPORT BACKUP FUNCTION ---
+function importBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = function(e) {
+    try {
+      const importedContent = e.target.result;
+      
+      // 1. Validate that the uploaded file is valid JSON
+      const parsedData = JSON.parse(importedContent);
+
+      // 2. Simple sanity check: Make sure key fields exist
+      if (parsedData.level === undefined || parsedData.exp === undefined) {
+        throw new Error("Invalid Gengar data structure.");
+      }
+
+      // 3. Prompt user for confirmation before overwriting current data
+      const confirmRestore = confirm(
+        `Are you sure you want to restore this backup?\n\nLevel: ${parsedData.level}\nTotal Meters: ${parsedData.totalMeters || 0}m\n\nThis will replace your current data on this browser.`
+      );
+
+      if (confirmRestore) {
+        // Save the imported data directly into localStorage
+        localStorage.setItem('gengarSwimData', JSON.stringify(parsedData));
+        alert("🎉 Backup restored successfully! Refreshing page...");
+        
+        // Reload page to reflect restored data in UI
+        window.location.reload();
+      }
+
+    } catch (err) {
+      alert("❌ Error importing backup: The selected file is corrupted or not a valid Gengar backup JSON.");
+      console.error(err);
+    }
+  };
+
+  // Read the selected file as text
+  reader.readAsText(file);
+  
+  // Reset the file input so the same file can be re-selected if needed
+  event.target.value = '';
+}
   </script>
 </body>
 </html>
