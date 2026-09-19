@@ -220,8 +220,133 @@
   color: #fff;
   box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
 }
+    /* Badges Section Styling */
+#badges-container {
+  background: #180d2b;
+  border: 1px solid #3b2164;
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.section-header h3 {
+  margin: 0 0 4px 0;
+  color: #d8b4fe;
+}
+
+.section-header p {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+/* The Grid Layout (Hevy/Game style) */
+#badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+/* Basic Badge Card styling */
+.badge-card {
+  background: #2a1848;
+  border: 1px solid #3b2164;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+/* Hover effect on unlocked badges */
+.badge-card.unlocked:hover {
+  transform: translateY(-3px);
+  border-color: #d8b4fe;
+  box-shadow: 0 5px 15px rgba(216, 180, 254, 0.4);
+}
+
+/* Sprites & Content */
+.badge-sprite-container {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 10px auto;
+  position: relative;
+}
+
+.generic-badge-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #8b5cf6, #ff2a5f);
+  border-radius: 50%;
+}
+
+.badge-details h4 {
+  color: #fff;
+  font-size: 0.9rem;
+  margin: 0 0 4px 0;
+}
+
+.badge-details p {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  margin: 0 0 8px 0;
+}
+
+.badge-status-label {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* --- LOCKED STATE --- */
+.badge-card.locked {
+  opacity: 0.6;
+}
+
+.badge-card.locked .generic-badge-placeholder {
+  filter: grayscale(100%) blur(1px); /* Greyed out and slightly blurred */
+  background: #475569;
+}
+
+.badge-card.locked .badge-status-label {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+/* --- UNLOCKED STATE --- */
+.badge-card.unlocked .badge-status-label {
+  color: #fff;
+  background: #14532d; /* Green background */
+  border: 1px solid #22c55e;
+}
+
+/* Special Neon Glow effect for the ultimate badge (Example: Ocean Explorer) */
+#badge-ocean.unlocked {
+  border: 1px solid #ff2a5f;
+  box-shadow: 0 0 10px rgba(255, 42, 95, 0.4);
+  animation: mega-badge-pulse 2s infinite;
+}
+
+@keyframes mega-badge-pulse {
+  0% { box-shadow: 0 0 10px rgba(255, 42, 95, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(255, 42, 95, 0.7); }
+  100% { box-shadow: 0 0 10px rgba(255, 42, 95, 0.4); }
+}
   </style>
 </head>
+  <!-- Pokémon Badges Section -->
+<div id="badges-container" class="dashboard-section hidden">
+  <div class="section-header">
+    <h3>🏆 Pokémon Gym Badges</h3>
+    <p>Unlock badges by hitting milestone distances!</p>
+  </div>
+  
+  <!-- Dynamic grid filled by JS -->
+  <div id="badges-grid"></div>
+</div>
 <body class="min-h-screen pb-12">
 
   <header class="border-b border-purple-900/50 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
@@ -1359,6 +1484,88 @@ function importBackup(event) {
   // Reset the file input so the same file can be re-selected if needed
   event.target.value = '';
 }
+    // --- 1. THE MASTER BADGE LIST & RULES ---
+const BADGE_DATA = [
+  // Core Distance Milestones
+  { id: 'dip', title: 'First Dip', desc: 'Log your first 100m!', metric: 'totalMeters', threshold: 100, sprite: 'badge_first_dip.png' },
+  { id: '1k', title: 'The Kilometer Club', desc: 'Swim 1,000 meters total.', metric: 'totalMeters', threshold: 1000, sprite: 'badge_1k.png' },
+  { id: '10k', title: '10k Marathoner', desc: 'Hit 10,000 meters swum.', metric: 'totalMeters', threshold: 10000, sprite: 'badge_10k.png' },
+  { id: 'ocean', title: 'Ocean Explorer', desc: 'Reach 50,000 meters swum.', metric: 'totalMeters', threshold: 50000, sprite: 'badge_ocean.png' },
+  
+  // Competitive Swimming Milestones (Examples)
+  { id: 'sprint_master', title: 'Sprint Master', desc: 'Complete 10 x 50m Sprint Set.', metric: 'totalMeters', threshold: 1, sprite: 'badge_sprint.png', type: 'special' }, // Example of a manual/special achievement
+  { id: 'iron_swimmer', title: 'Iron Swimmer', desc: 'Swim 3,800m in one session (Ironman Distance).', metric: 'totalMeters', threshold: 1, sprite: 'badge_iron.png', type: 'special' } // Placeholder for single-session achievement logic
+];
+
+// Array to track which badges are currently unlocked
+let unlockedBadges = JSON.parse(localStorage.getItem('gengarUnlockedBadges')) || [];
+
+// --- 2. THE RENDER FUNCTION ---
+// Creates the visual grid based on the BADGE_DATA list and totalMeters state
+function renderBadges() {
+  const container = document.getElementById('badges-grid');
+  if (!container) return; // Exit if element doesn't exist yet
+  
+  container.innerHTML = ''; // Clear existing content
+
+  // We are checking the unlock state against the master appData.totalMeters value.
+  // Assuming 'appData.totalMeters' exists from your main saving logic.
+  const currentTotalMeters = appData.totalMeters || 0; 
+  let newlyUnlockedBadgesCount = 0;
+
+  BADGE_DATA.forEach(badge => {
+    // Check if the badge's unlock criteria are met (if it's a dynamic metric badge)
+    const isCriteriaMet = (badge.type !== 'special') && (currentTotalMeters >= badge.threshold);
+    
+    // Check if we've already recorded this badge as unlocked previously
+    const isPreviouslyUnlocked = unlockedBadges.includes(badge.id);
+
+    // Track a new unlock to play a sound or notification later
+    if (isCriteriaMet && !isPreviouslyUnlocked) {
+      unlockedBadges.push(badge.id);
+      newlyUnlockedBadgesCount++;
+    }
+
+    const isCurrentlyUnlocked = isCriteriaMet || isPreviouslyUnlocked;
+
+    // Create the Badge HTML element
+    const badgeElement = document.createElement('div');
+    badgeElement.className = `badge-card ${isCurrentlyUnlocked ? 'unlocked' : 'locked'}`;
+    badgeElement.id = `badge-${badge.id}`;
+
+    // Add content to the badge card
+    // Note: If you don't have PNG sprites yet, you can replace the <img> with a generic <div> for now.
+    badgeElement.innerHTML = `
+      <div class="badge-sprite-container">
+        <!-- Optional pixel sprite image -->
+        <!-- <img src="sprites/${badge.sprite}" alt="${badge.title} Sprite" class="badge-sprite ${isCurrentlyUnlocked ? '' : 'pixelated'}"> -->
+        <div class="generic-badge-placeholder ${isCurrentlyUnlocked ? '' : 'locked-overlay'}"></div>
+      </div>
+      <div class="badge-details">
+        <h4>${badge.title}</h4>
+        <p>${badge.desc}</p>
+        <span class="badge-status-label">${isCurrentlyUnlocked ? '🏆 UNLOCKED' : '🔒 LOCKED'}</span>
+      </div>
+    `;
+
+    container.appendChild(badgeElement);
+  });
+
+  // Save the newly unlocked badges list to memory
+  if (newlyUnlockedBadgesCount > 0) {
+    localStorage.setItem('gengarUnlockedBadges', JSON.stringify(unlockedBadges));
+    // Optional: Play a Poké-Achievement jingle sound effect here!
+  }
+}
+
+// --- 3. INTEGRATE WITH EXISTING SAVE/LOAD FUNCTIONS ---
+// Add this line inside your 'window.onload' function from the 'Memory' step
+// window.onload = function() {
+//   loadData();
+//   renderBadges(); // Call the renderer when the page loads
+// };
+    
+    
   </script>
 </body>
 </html>
